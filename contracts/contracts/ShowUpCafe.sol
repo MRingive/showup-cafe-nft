@@ -11,6 +11,19 @@ contract ShowUpCafe is ERC721, Ownable, PullPayment {
 
     Counters.Counter private _tokenIdCounter;
 
+    // TODO: events for show up ? Would give history but would also cost
+    // a lot more.
+    // Even without events it will be possible to track history. Just a
+    // lot more difficult.
+
+    struct ShowUpInfo {
+        uint256 lastTimestamp;
+        uint sum;
+    }
+
+    // Mapping from token ID to show up information.
+    mapping(uint256 => ShowUpInfo) private _showUps;
+
     constructor() ERC721("ShowUpCafe", "SUC") {}
 
     function _baseURI() internal pure override returns (string memory) {
@@ -24,6 +37,39 @@ contract ShowUpCafe is ERC721, Ownable, PullPayment {
 
         uint256 tokenId = _tokenIdCounter.current();
         _tokenIdCounter.increment();
+
+        _showUps[tokenId] = ShowUpInfo(block.timestamp, 0);
+
         _safeMint(to, tokenId);
+    }
+
+    function getShowUpInformation(uint tokenId) public view 
+    returns (ShowUpInfo memory) {
+        return _showUps[tokenId];
+    }
+
+    function showUp(uint tokenId) public onlyTokenOwner(tokenId) {
+        ShowUpInfo storage showUpInfo = _showUps[tokenId];
+
+        _verifyIsNotLate(showUpInfo.lastTimestamp);
+        _verifyIsNotEarly(showUpInfo.lastTimestamp);
+
+        showUpInfo.sum = showUpInfo.sum + 1;
+        showUpInfo.lastTimestamp = block.timestamp;
+    }
+
+    function _verifyIsNotEarly(uint timestamp) private view {
+        uint lockout = timestamp + 8 hours;
+        require(block.timestamp >= lockout, "Too early");
+    }
+
+    function _verifyIsNotLate(uint timestamp) private view {
+        uint deadline = timestamp + 32 hours;
+        require(block.timestamp <= deadline, "Too late");
+    }
+
+    modifier onlyTokenOwner(uint tokenId) {
+        require(msg.sender == ownerOf(tokenId), "Not token owner");
+        _;
     }
 }
