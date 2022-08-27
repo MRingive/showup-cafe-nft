@@ -48,24 +48,43 @@ contract ShowUpCafe is ERC721, Ownable, PullPayment {
         return _showUps[tokenId];
     }
 
+    function canShowUp(uint tokenId) public view returns (bool) {
+        ShowUpInfo memory showUpInfo = _showUps[tokenId];
+        uint lastTimestamp = showUpInfo.lastTimestamp;
+
+        return !_isEarly(lastTimestamp) && !_isLate(lastTimestamp);
+    }
+
+    function _isEarly(uint timestamp) private view returns (bool) {
+        uint lockout = timestamp + 8 hours;
+        return block.timestamp < lockout;
+    }
+
+    function _isLate(uint timestamp) private view returns (bool) {
+        uint deadline = timestamp + 32 hours;
+        return block.timestamp > deadline;
+    }
+
     function showUp(uint tokenId) public onlyTokenOwner(tokenId) {
         ShowUpInfo storage showUpInfo = _showUps[tokenId];
 
-        _verifyIsNotLate(showUpInfo.lastTimestamp);
-        _verifyIsNotEarly(showUpInfo.lastTimestamp);
+        _verifyCanShowUp(showUpInfo.lastTimestamp);
 
         showUpInfo.sum = showUpInfo.sum + 1;
         showUpInfo.lastTimestamp = block.timestamp;
     }
 
+    function _verifyCanShowUp(uint timestamp) private view {
+        _verifyIsNotEarly(timestamp);
+        _verifyIsNotLate(timestamp);
+    }
+
     function _verifyIsNotEarly(uint timestamp) private view {
-        uint lockout = timestamp + 8 hours;
-        require(block.timestamp >= lockout, "Too early");
+        require(!_isEarly(timestamp), "Too early");
     }
 
     function _verifyIsNotLate(uint timestamp) private view {
-        uint deadline = timestamp + 32 hours;
-        require(block.timestamp <= deadline, "Too late");
+        require(!_isLate(timestamp), "Too late");
     }
 
     modifier onlyTokenOwner(uint tokenId) {

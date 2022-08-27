@@ -4,6 +4,9 @@ import { ethers } from "hardhat";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 describe("ShowUpCafe", function () {
+
+  const EIGHT_HOURS_IN_SECONDS = 28800
+  const THIRTY_TWO_HOURS_IN_SECONDS = 115200
   
   async function contractDeployedFixture() {
     // Contracts are deployed using the first signer/account by default
@@ -111,6 +114,50 @@ describe("ShowUpCafe", function () {
 
   });
 
+  describe("can show up?", () => {
+
+    it("should be able to show up after lock out period", async () => {
+      const { contract, otherAccount } = await loadFixture(contractDeployedFixture);
+
+      await contract.safeMint(otherAccount.address, { value: ethers.utils.parseUnits("10")})
+
+      await time.increase(EIGHT_HOURS_IN_SECONDS);
+
+      expect(await contract.canShowUp(0)).to.equal(true)
+    });
+
+    it("should not be able to show up before lock out period", async () => {
+      const { contract, otherAccount } = await loadFixture(contractDeployedFixture);
+
+      await contract.safeMint(otherAccount.address, { value: ethers.utils.parseUnits("10")})
+
+      await time.increase(EIGHT_HOURS_IN_SECONDS - 1);
+
+      expect(await contract.canShowUp(0)).to.equal(false)
+    });
+
+    it("should be able to show up before deadline", async () => {
+      const { contract, otherAccount } = await loadFixture(contractDeployedFixture);
+
+      await contract.safeMint(otherAccount.address, { value: ethers.utils.parseUnits("10")})
+
+      await time.increase(THIRTY_TWO_HOURS_IN_SECONDS);
+
+      expect(await contract.canShowUp(0)).to.equal(true)
+    });
+
+    it("should not be able to show up after deadline", async () => {
+      const { contract, otherAccount } = await loadFixture(contractDeployedFixture);
+
+      await contract.safeMint(otherAccount.address, { value: ethers.utils.parseUnits("10")})
+
+      await time.increase(THIRTY_TWO_HOURS_IN_SECONDS + 1);
+
+      expect(await contract.canShowUp(0)).to.equal(false)
+    });
+
+  });
+
   describe("Show up", () => {
 
     it("should revert on wrong token owner", async () => {
@@ -134,7 +181,7 @@ describe("ShowUpCafe", function () {
 
       await contract.safeMint(owner.address, { value: ethers.utils.parseUnits("10")})
 
-      await time.increase(115200);
+      await time.increase(THIRTY_TWO_HOURS_IN_SECONDS);
 
       await expect(contract.showUp(0)).to.be.revertedWith("Too late");
     });
@@ -144,7 +191,7 @@ describe("ShowUpCafe", function () {
 
       await contract.safeMint(owner.address, { value: ethers.utils.parseUnits("10")})
 
-      await time.increase(115200 - 1);
+      await time.increase(THIRTY_TWO_HOURS_IN_SECONDS - 1);
 
       await contract.showUp(0);
 
@@ -166,13 +213,13 @@ describe("ShowUpCafe", function () {
       expect(showUpInfoBefore.lastTimestamp).to.equal(timestampBefore)
       expect(showUpInfoBefore.sum).to.equal(0)
 
-      await time.increase(28800);
+      await time.increase(EIGHT_HOURS_IN_SECONDS);
 
       await contract.showUp(0);
 
       const showUpInfo = await contract.getShowUpInformation(0)
 
-      expect(showUpInfo.lastTimestamp).to.equal(timestampBefore + 28800 + 1)
+      expect(showUpInfo.lastTimestamp).to.equal(timestampBefore + EIGHT_HOURS_IN_SECONDS + 1)
       expect(showUpInfo.sum).to.equal(1)
     });
 
@@ -181,7 +228,7 @@ describe("ShowUpCafe", function () {
 
       await contract.safeMint(owner.address, { value: ethers.utils.parseUnits("10")})
 
-      await time.increase(28800-2);
+      await time.increase(EIGHT_HOURS_IN_SECONDS - 2);
 
       await expect(contract.showUp(0)).to.be.revertedWith("Too early");
     });
@@ -191,7 +238,7 @@ describe("ShowUpCafe", function () {
 
       await contract.safeMint(owner.address, { value: ethers.utils.parseUnits("10")})
 
-      await time.increase(28800-1);
+      await time.increase(EIGHT_HOURS_IN_SECONDS - 1);
 
       await contract.showUp(0);
 
@@ -204,11 +251,11 @@ describe("ShowUpCafe", function () {
 
       await contract.safeMint(owner.address, { value: ethers.utils.parseUnits("10")})
 
-      await time.increase(28800-1);
+      await time.increase(EIGHT_HOURS_IN_SECONDS - 1);
 
       await contract.showUp(0);
 
-      await time.increase(28800-2);
+      await time.increase(EIGHT_HOURS_IN_SECONDS - 2);
 
       await expect(contract.showUp(0)).to.be.revertedWith("Too early");
     });
@@ -218,19 +265,17 @@ describe("ShowUpCafe", function () {
 
       await contract.safeMint(owner.address, { value: ethers.utils.parseUnits("10")})
 
-      await time.increase(28800-1);
+      await time.increase(EIGHT_HOURS_IN_SECONDS - 1);
 
       await contract.showUp(0);
 
-      await time.increase(28800-1);
+      await time.increase(EIGHT_HOURS_IN_SECONDS - 1);
 
       await contract.showUp(0);
 
       const showUpInfo = await contract.getShowUpInformation(0)
       expect(showUpInfo.sum).to.equal(2)
     });
-
-
   });
 
 });
